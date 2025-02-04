@@ -13,7 +13,7 @@ class _StartPageState extends State<StartPage> {
   late stt.SpeechToText _speech;
   bool _isListening = false;
   String _recordedText = 'Press the button and start speaking';
-  List<String> records = [];
+  final StringBuffer _speechTextBuffer = StringBuffer();
 
   @override
   void initState() {
@@ -21,29 +21,58 @@ class _StartPageState extends State<StartPage> {
     _speech = stt.SpeechToText();
   }
 
-  void _toggleListening() async {
-    if (_isListening) {
-      _speech.stop();
-      setState(() => _isListening = false);
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomePage(records: records),
-        ),
-      );
-    } else {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(onResult: (result) {
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onError: (val) {
+          print('Error: $val');
           setState(() {
-            _recordedText = result.recognizedWords;
-            records.add(_recordedText);
+            _isListening = false;
           });
+        },
+        onStatus: (val) {
+          print('Status: $val');
+          if (val == "not listening" || val == "done") {
+            setState(() {
+              _isListening = false;
+            });
+            _navigateToNextPage();
+          }
+        },
+      );
+      if (available) {
+        setState(() {
+          _isListening = true;
         });
+        _startListening();
       }
+    } else {
+      setState(() {
+        _isListening = false;
+      });
+      await _speech.stop();
+      _navigateToNextPage();
     }
+  }
+
+  void _startListening() {
+  _speech.listen(onResult: (result) {
+      if (result.finalResult) { 
+        _recordedText = result.recognizedWords;
+        _speechTextBuffer.write("$_recordedText ");
+      }
+    });
+}
+
+
+  void _navigateToNextPage() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomePage(records: _speechTextBuffer), 
+      ),
+      (route) => false,
+    );
   }
 
   @override
@@ -66,7 +95,7 @@ class _StartPageState extends State<StartPage> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton.large(
-        onPressed: _toggleListening,
+        onPressed: _listen,
         child: Icon(_isListening ? Icons.pause : Icons.mic),
         tooltip: 'Record Audio',
       ),

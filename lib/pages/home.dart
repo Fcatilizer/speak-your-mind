@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class HomePage extends StatefulWidget {
-  final List<String> records;
+  final StringBuffer records;
 
   const HomePage({super.key, required this.records});
   @override
@@ -110,7 +110,7 @@ class _HomePageState extends State<HomePage>
                           padding: const EdgeInsets.all(16.0),
                           child: SingleChildScrollView(
                             child: Text(
-                              widget.records.join('\n'),
+                              widget.records.toString(),
                               style: const TextStyle(fontSize: 20.0),
                               textAlign: TextAlign.left,
                             ),
