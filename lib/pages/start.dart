@@ -56,20 +56,25 @@ class _StartPageState extends State<StartPage> {
   }
 
   void _startListening() {
-  _speech.listen(onResult: (result) {
-      if (result.finalResult) { 
-        _recordedText = result.recognizedWords;
-        _speechTextBuffer.write("$_recordedText ");
+    _speech.listen(onResult: (result) {
+      if (result.finalResult) {
+        setState(() {
+          _recordedText = result.recognizedWords;
+          _speechTextBuffer.write("$_recordedText ");
+        });
+      } else {
+        setState(() {
+          _recordedText = result.recognizedWords;
+        });
       }
     });
-}
-
+  }
 
   void _navigateToNextPage() {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (context) => HomePage(records: _speechTextBuffer), 
+        builder: (context) => HomePage(records: _speechTextBuffer),
       ),
       (route) => false,
     );
