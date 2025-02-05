@@ -21,55 +21,77 @@ class _StartPageState extends State<StartPage> {
     _speech = stt.SpeechToText();
   }
 
-  void _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onError: (val) {
-          print('Error: $val');
+void _listen() async {
+  if (!_isListening) {
+    bool available = await _speech.initialize(
+      onError: (val) {
+        print('Error: $val');
+        if (mounted) { 
           setState(() {
             _isListening = false;
           });
-        },
-        onStatus: (val) {
-          print('Status: $val');
+        }
+      },
+      onStatus: (val) {
+        print('Status: $val');
+        if (mounted) { 
           if (val == "not listening" || val == "done") {
             setState(() {
               _isListening = false;
             });
             _navigateToNextPage();
           }
-        },
-      );
-      if (available) {
+        }
+      },
+    );
+    if (available) {
+      if (mounted) { 
         setState(() {
           _isListening = true;
         });
-        _startListening();
       }
-    } else {
+      _startListening();
+    }
+  } else {
+    if (mounted) { 
       setState(() {
         _isListening = false;
       });
-      await _speech.stop();
-      _navigateToNextPage();
     }
+    await _speech.stop();
+    _navigateToNextPage();
   }
-
-  void _startListening() {
-  _speech.listen(onResult: (result) {
-      if (result.finalResult) { 
-        _recordedText = result.recognizedWords;
-        _speechTextBuffer.write("$_recordedText ");
-      }
-    });
 }
+
+void _startListening() {
+  _speech.listen(onResult: (result) {
+    if (mounted) { 
+      if (result.finalResult) {
+        setState(() {
+          _recordedText = result.recognizedWords;
+          _speechTextBuffer.write("$_recordedText ");
+        });
+      } else {
+        setState(() {
+          _recordedText = result.recognizedWords;
+        });
+      }
+    }
+  });
+}
+
+  @override
+  void dispose() {
+    _speech.stop();
+    super.dispose();
+  }
 
 
   void _navigateToNextPage() {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (context) => HomePage(records: _speechTextBuffer), 
+        builder: (context) => HomePage(records: _speechTextBuffer),
       ),
       (route) => false,
     );

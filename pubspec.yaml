@@ -37,6 +37,8 @@ dependencies:
   dynamic_color: ^1.7.0
   speech_to_text: ^7.0.0
   permission_handler: ^10.4.0
+  avatar_glow: ^3.0.1
+  
 
 dev_dependencies:
   flutter_test:
