@@ -1,3 +1,4 @@
+import 'package:avatar_glow/avatar_glow.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -21,32 +22,50 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _speech = stt.SpeechToText();
   }
-
-  void _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onStatus: (val) {
-          print('onStatus: $val');
+  
+void _listen() async {
+  if (!_isListening) {
+    bool available = await _speech.initialize(
+      onError: (val) {
+        print('Error: $val');
+        if (mounted) { 
           setState(() {
-            _isListening = val == 'listening';
+            _isListening = false;
           });
-        },
-        onError: (val) {
-          print('onError: $val');
-          setState(() => _isListening = false);
-        },
-      );
-      if (available) {
-        _startListening();
+        }
+      },
+      onStatus: (val) {
+        print('Status: $val');
+        if (mounted) { 
+          if (val == "not listening" || val == "done") {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        }
+      },
+    );
+    if (available) {
+      if (mounted) { 
+        setState(() {
+          _isListening = true;
+        });
       }
-    } else {
-      _speech.stop();
-      setState(() => _isListening = false);
+      _startListening();
     }
+  } else {
+    if (mounted) { 
+      setState(() {
+        _isListening = false;
+      });
+    }
+    await _speech.stop();
   }
+}
 
-  void _startListening() {
-    _speech.listen(onResult: (result) {
+void _startListening() {
+  _speech.listen(onResult: (result) {
+    if (mounted) { 
       if (result.finalResult) {
         setState(() {
           _recordedText = result.recognizedWords;
@@ -57,9 +76,9 @@ class _HomePageState extends State<HomePage>
           _recordedText = result.recognizedWords;
         });
       }
-    });
-  }
-
+    }
+  });
+}
   @override
   void dispose() {
     _speech.stop();
@@ -68,6 +87,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(title: const Text('Speak your Mind')),
       body: Stack(
@@ -147,25 +167,21 @@ class _HomePageState extends State<HomePage>
               ],
             ),
           ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 400),
+         AnimatedPositioned(
+            duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
-            left: _isListening
-                ? MediaQuery.of(context).size.width / 2 - 40
-                : null,
-            right: _isListening ? null : 16,
-            bottom:
-                _isListening ? MediaQuery.of(context).size.height / 2 - 40 : 16,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOut,
-              width: _isListening ? 80.0 : 56.0,
-              height: _isListening ? 80.0 : 56.0,
-              child: FloatingActionButton(
-                onPressed: _listen,
-                child: Icon(
-                  _isListening ? Icons.pause : Icons.mic,
-                  size: _isListening ? 40 : 24,
+            bottom: 30,
+            right: _isListening ? screenWidth / 2 - 30 : 30,
+            child: AvatarGlow(
+              animate: _isListening,
+              glowColor: Theme.of(context).primaryColor,
+              duration: const Duration(milliseconds: 2000),
+              repeat: true,
+              child: GestureDetector(
+                onTap: _listen,
+                child: FloatingActionButton(
+                  onPressed: _listen,
+                  child: Icon(_isListening ? Icons.pause : Icons.mic),
                 ),
               ),
             ),
