@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:healthbot/pages/home.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:healthbot/pages/start.dart';
 
-void main() {
+void main() async {
+  await dotenv.load();
   runApp(const MyApp());
 }
 

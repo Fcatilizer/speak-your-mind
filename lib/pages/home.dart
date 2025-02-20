@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'package:avatar_glow/avatar_glow.dart';
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -16,69 +19,102 @@ class _HomePageState extends State<HomePage>
   late stt.SpeechToText _speech;
   bool _isListening = false;
   String _recordedText = '';
+  String responseText = '';
+  late Future<String>? _futureResponse;
+
+  Future<String> getEmotionPrediction(String text) async {
+    final url = Uri.parse(dotenv.env["API_URL"]!);
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"text": text}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data["predicted_emotion"];
+      } else {
+        print("Error: ${response.statusCode} - ${response.body}");
+        return "Error";
+      }
+    } catch (e) {
+      print("Exception: $e");
+      return "Exception";
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
+    _futureResponse = getEmotionPrediction(widget.records.toString());
   }
-  
-void _listen() async {
-  if (!_isListening) {
-    bool available = await _speech.initialize(
-      onError: (val) {
-        print('Error: $val');
-        if (mounted) { 
-          setState(() {
-            _isListening = false;
-          });
-        }
-      },
-      onStatus: (val) {
-        print('Status: $val');
-        if (mounted) { 
-          if (val == "not listening" || val == "done") {
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onError: (val) {
+          print('Error: $val');
+          if (mounted) {
             setState(() {
               _isListening = false;
             });
           }
+        },
+        onStatus: (val) async {
+          print('Status: $val');
+          if (mounted) {
+            if (val == "not listening" || val == "done") {
+              setState(() {
+                _isListening = false;
+              });
+              _futureResponse =
+                  (await getEmotionPrediction(widget.records.toString()))
+                      as Future<String>?;
+              print(widget.records.toString());
+            }
+          }
+        },
+      );
+      if (available) {
+        if (mounted) {
+          setState(() {
+            _isListening = true;
+          });
         }
-      },
-    );
-    if (available) {
-      if (mounted) { 
+        _startListening();
+      }
+    } else {
+      if (mounted) {
         setState(() {
-          _isListening = true;
+          _isListening = false;
         });
       }
-      _startListening();
+      await _speech.stop();
+      _futureResponse = getEmotionPrediction(widget.records.toString());
+      print(widget.records.toString());
     }
-  } else {
-    if (mounted) { 
-      setState(() {
-        _isListening = false;
-      });
-    }
-    await _speech.stop();
   }
-}
 
-void _startListening() {
-  _speech.listen(onResult: (result) {
-    if (mounted) { 
-      if (result.finalResult) {
-        setState(() {
-          _recordedText = result.recognizedWords;
-          widget.records.write("$_recordedText ");
-        });
-      } else {
-        setState(() {
-          _recordedText = result.recognizedWords;
-        });
+  void _startListening() {
+    _speech.listen(onResult: (result) {
+      if (mounted) {
+        if (result.finalResult) {
+          setState(() {
+            _recordedText = result.recognizedWords;
+            widget.records.write("$_recordedText ");
+          });
+        } else {
+          setState(() {
+            _recordedText = result.recognizedWords;
+          });
+        }
       }
-    }
-  });
-}
+    });
+  }
+
   @override
   void dispose() {
     _speech.stop();
@@ -151,23 +187,35 @@ void _startListening() {
                           width: 2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(16.0),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: Text(
-                          "Hello World",
-                          style: TextStyle(fontSize: 20.0),
-                          textAlign: TextAlign.left,
+                        child: FutureBuilder<String>(
+                          future: _futureResponse,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const CircularProgressIndicator();
+                            } else if (snapshot.hasError) {
+                              return Text("Error: ${snapshot.error}");
+                            } else {
+                              return Text(
+                                snapshot.data ?? "No response",
+                                style: const TextStyle(fontSize: 20.0),
+                                textAlign: TextAlign.left,
+                              );
+                            }
+                          },
                         ),
                       ),
                     ),
                   ),
-                ),
+                )
               ],
             ),
           ),
-         AnimatedPositioned(
+          AnimatedPositioned(
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
             bottom: 30,
