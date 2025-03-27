@@ -20,9 +20,12 @@ class _HomePageState extends State<HomePage>
   bool _isListening = false;
   String _recordedText = '';
   String responseText = '';
-  late Future<String>? _futureResponse;
+  String? cleanedText;
+  String? predictedEmotion;
+  late Future<Map<String, String>>? _futureResponse;
+  final StringBuffer _speechTextBuffer = StringBuffer();
 
-  Future<String> getEmotionPrediction(String text) async {
+  Future<Map<String, String>> getEmotionPrediction(String text) async {
     final url = Uri.parse(dotenv.env["API_URL"]!);
 
     try {
@@ -34,14 +37,18 @@ class _HomePageState extends State<HomePage>
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data["predicted_emotion"];
+        _speechTextBuffer.write(data["cleaned_text"]);
+        return {
+          "cleaned_text": data["cleaned_text"],
+          "predicted_emotion": data["predicted_emotion"]
+        };
       } else {
         print("Error: ${response.statusCode} - ${response.body}");
-        return "Error";
+        return {"cleaned_text": "", "predicted_emotion": "Error"};
       }
     } catch (e) {
       print("Exception: $e");
-      return "Exception";
+      return {"cleaned_text": "", "predicted_emotion": "Exception"};
     }
   }
 
@@ -70,14 +77,21 @@ class _HomePageState extends State<HomePage>
               setState(() {
                 _isListening = false;
               });
-              _futureResponse =
-                  (await getEmotionPrediction(widget.records.toString()))
-                      as Future<String>?;
+
+              final response =
+                  await getEmotionPrediction(widget.records.toString());
+
+              setState(() {
+                cleanedText = response["cleaned_text"];
+                predictedEmotion = response["predicted_emotion"];
+              });
+
               print(widget.records.toString());
             }
           }
         },
       );
+
       if (available) {
         if (mounted) {
           setState(() {
@@ -93,7 +107,14 @@ class _HomePageState extends State<HomePage>
         });
       }
       await _speech.stop();
-      _futureResponse = getEmotionPrediction(widget.records.toString());
+
+      final response = await getEmotionPrediction(widget.records.toString());
+
+      setState(() {
+        cleanedText = response["cleaned_text"];
+        predictedEmotion = response["predicted_emotion"];
+      });
+
       print(widget.records.toString());
     }
   }
@@ -165,7 +186,7 @@ class _HomePageState extends State<HomePage>
                               padding: const EdgeInsets.all(16.0),
                               child: SingleChildScrollView(
                                 child: Text(
-                                  widget.records.toString(),
+                                  _speechTextBuffer.toString(),
                                   style: const TextStyle(fontSize: 20.0),
                                   textAlign: TextAlign.left,
                                 ),
@@ -191,19 +212,24 @@ class _HomePageState extends State<HomePage>
                       padding: const EdgeInsets.all(16.0),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: FutureBuilder<String>(
+                        child: FutureBuilder<Map<String, String>>(
                           future: _futureResponse,
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
-                              return const CircularProgressIndicator();
+                              return CircularProgressIndicator();
                             } else if (snapshot.hasError) {
                               return Text("Error: ${snapshot.error}");
+                            } else if (!snapshot.hasData ||
+                                snapshot.data == null) {
+                              return Text("No response");
                             } else {
-                              return Text(
-                                snapshot.data ?? "No response",
-                                style: const TextStyle(fontSize: 20.0),
-                                textAlign: TextAlign.left,
+                              final data = snapshot.data!;
+                              return Column(
+                                children: [
+                                  Text(data["predicted_emotion"] ??
+                                      "Predicted Emotion: N/A"),
+                                ],
                               );
                             }
                           },
